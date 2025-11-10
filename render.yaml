@@ -1,0 +1,19 @@
+# Render Deployment Configuration
+
+## Backend (Web Service)
+
+buildCommand = npm install
+startCommand = node server.js
+
+[[envVars]]
+key = "NODE_ENV"
+value = "production"
+
+[[envVars]]
+key = "PORT"
+value = "5000"
+
+# Add these manually in Render Dashboard:
+# MONGO_URI
+# JWT_SECRET
+# FRONTEND_URL
