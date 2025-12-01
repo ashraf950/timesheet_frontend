@@ -8,6 +8,7 @@ export default function LoginPage({ onSubmit }) {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   function validate() {
     const e = {};
@@ -70,6 +71,7 @@ export default function LoginPage({ onSubmit }) {
               placeholder="you@example.com"
               aria-invalid={!!errors.email}
               aria-describedby={errors.email ? "email-error" : undefined}
+              autoComplete="email"
             />
             {errors.email && (
               <p id="email-error" className="mt-1 text-xs text-red-600">{errors.email}</p>
@@ -91,6 +93,7 @@ export default function LoginPage({ onSubmit }) {
                 placeholder="Your secure password"
                 aria-invalid={!!errors.password}
                 aria-describedby={errors.password ? "password-error" : undefined}
+                autoComplete="current-password"
               />
 
               <button
@@ -109,7 +112,12 @@ export default function LoginPage({ onSubmit }) {
 
           <div className="flex items-center justify-between mb-6">
             <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" className="rounded border-slate-300" />
+              <input
+                type="checkbox"
+                className="rounded border-slate-300"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
               <span className="text-slate-600">Remember me</span>
             </label>
             <a href="#" className="text-sm text-indigo-600 hover:underline">Forgot password?</a>
