@@ -25,7 +25,24 @@ import {
   Snackbar,
   Alert,
   MenuItem,
+  IconButton,
+  Tooltip,
+  Divider,
 } from "@mui/material";
+import {
+  Receipt,
+  Add,
+  Visibility,
+  GetApp,
+  Payment,
+  CheckCircle,
+  DateRange,
+  Person,
+  AttachMoney,
+  Business,
+  Email,
+  Close,
+} from "@mui/icons-material";
 
 export default function Invoices() {
   const dispatch = useDispatch();
@@ -35,10 +52,9 @@ export default function Invoices() {
   const { user } = useSelector((state) => state.auth);
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [users, setUsers] = useState([]);
-  const [manualUserId, setManualUserId] = useState(false);
   const [invoiceForm, setInvoiceForm] = useState({
     userId: "",
     clientName: "",
@@ -46,12 +62,6 @@ export default function Invoices() {
     startDate: "",
     endDate: "",
     hourlyRate: "",
-  });
-  const [paymentForm, setPaymentForm] = useState({
-    paymentDate: new Date().toISOString().split('T')[0],
-    paymentMethod: "Bank Transfer",
-    transactionId: "",
-    notes: "",
   });
   const [snackbar, setSnackbar] = useState({ open: false, message: "", severity: "success" });
 
@@ -62,12 +72,11 @@ export default function Invoices() {
 
   const fetchUsers = async () => {
     try {
-      // Try the dedicated users endpoint first (if backend implements it)
+      // Try the dedicated users endpoint first
       try {
         const response = await API.get("/auth/users");
         if (response.data.success) {
           setUsers(response.data.data || []);
-          console.log(`Loaded ${response.data.count} users successfully from /auth/users`);
           return;
         }
       } catch (err) {
@@ -75,242 +84,72 @@ export default function Invoices() {
       }
 
       // Alternative: Get all invoices which should have populated user data
-      try {
-        const invoiceResponse = await API.get("/invoice");
-        const invoices = invoiceResponse.data.data?.invoices || invoiceResponse.data.invoices || invoiceResponse.data || [];
-        
-        const uniqueUsersMap = new Map();
-        
-        invoices.forEach(invoice => {
-          const userObj = invoice.userId;
-          if (userObj && typeof userObj === 'object') {
-            const userId = userObj._id || userObj.id;
-            if (userId && !uniqueUsersMap.has(userId)) {
-              uniqueUsersMap.set(userId, {
-                _id: userId,
-                id: userId,
-                name: userObj.name || "Unknown User",
-                email: userObj.email || "",
-                role: userObj.role || "Employee",
-                department: userObj.department || "",
-                hourlyRate: userObj.hourlyRate || 0
-              });
-            }
-          }
-        });
-        
-        const usersFromInvoices = Array.from(uniqueUsersMap.values());
-        
-        if (usersFromInvoices.length > 0) {
-          setUsers(usersFromInvoices);
-          console.log(`Loaded ${usersFromInvoices.length} users from invoices`);
-          return;
-        }
-      } catch (invoiceErr) {
-        console.log("Could not extract users from invoices");
-      }
+      const invoiceResponse = await API.get("/invoice");
+      const invoices = invoiceResponse.data.data?.invoices || invoiceResponse.data.invoices || invoiceResponse.data || [];
 
-      // Last resort: Request timesheets with populate to get all users
-      try {
-        // Try to get all timesheets (might require admin permissions)
-        const timesheetResponse = await API.get("/timesheet?populate=userId");
-        const timesheets = timesheetResponse.data.data?.timesheets || timesheetResponse.data.timesheets || timesheetResponse.data || [];
-        
-        const uniqueUsersMap = new Map();
-        
-        timesheets.forEach(ts => {
-          const userObj = ts.userId;
-          if (userObj && typeof userObj === 'object') {
-            const userId = userObj._id || userObj.id;
-            if (userId && !uniqueUsersMap.has(userId)) {
-              uniqueUsersMap.set(userId, {
-                _id: userId,
-                id: userId,
-                name: userObj.name || "Unknown User",
-                email: userObj.email || "",
-                role: userObj.role || "Employee",
-                department: userObj.department || "",
-                hourlyRate: userObj.hourlyRate || 0
-              });
-            }
+      const uniqueUsersMap = new Map();
+      invoices.forEach(invoice => {
+        const userObj = invoice.userId;
+        if (userObj && typeof userObj === 'object') {
+          const userId = userObj._id || userObj.id;
+          if (userId && !uniqueUsersMap.has(userId)) {
+            uniqueUsersMap.set(userId, {
+              _id: userId,
+              name: userObj.name || "Unknown User",
+              email: userObj.email || "",
+              role: userObj.role || "Employee",
+            });
           }
-        });
-        
-        const usersFromTimesheets = Array.from(uniqueUsersMap.values());
-        
-        if (usersFromTimesheets.length > 0) {
-          setUsers(usersFromTimesheets);
-          console.log(`Loaded ${usersFromTimesheets.length} users from timesheets`);
-          return;
         }
-      } catch (timesheetErr) {
-        console.log("Could not extract users from timesheets");
-      }
-
-      // If all methods fail, show error
-      setSnackbar({
-        open: true,
-        message: "Unable to load users. Please ask your backend developer to implement the /api/auth/users endpoint.",
-        severity: "warning"
       });
-      setUsers([]);
-      
+      setUsers(Array.from(uniqueUsersMap.values()));
     } catch (error) {
-      console.error("Error fetching users:", error);
-      
-      if (error.response?.status === 403) {
-        setSnackbar({
-          open: true,
-          message: "Access denied. You need Admin, Manager, or Finance role to generate invoices.",
-          severity: "error"
-        });
-      } else if (error.response?.status === 401) {
-        setSnackbar({
-          open: true,
-          message: "Session expired. Please login again.",
-          severity: "warning"
-        });
-      } else {
-        setSnackbar({
-          open: true,
-          message: "Unable to load users. Please ensure backend endpoint /api/auth/users is implemented.",
-          severity: "warning"
-        });
-      }
-      setUsers([]);
+      console.error("Failed to fetch users", error);
     }
   };
 
-  useEffect(() => {
-    if (error || generateError) {
-      setSnackbar({
-        open: true,
-        message: error || generateError,
-        severity: "error"
-      });
-    }
-  }, [error, generateError]);
-
-  const handleGenerateInvoice = () => {
-    setDialogOpen(true);
-  };
-
-  const handleSubmitInvoice = () => {
-    if (!invoiceForm.userId || !invoiceForm.clientName || !invoiceForm.startDate || !invoiceForm.endDate || !invoiceForm.hourlyRate) {
-      setSnackbar({
-        open: true,
-        message: "Please fill all required fields",
-        severity: "error"
-      });
-      return;
-    }
-
-    // Map frontend field names to backend expected names
-    dispatch(generateInvoice({
-      userId: invoiceForm.userId, // Use selected employee's userId
-      clientName: invoiceForm.clientName,
-      clientEmail: invoiceForm.clientEmail,
-      periodStart: invoiceForm.startDate, // Backend expects periodStart
-      periodEnd: invoiceForm.endDate,     // Backend expects periodEnd
-      hourlyRate: parseFloat(invoiceForm.hourlyRate)
-    })).then((result) => {
+  const handleGenerate = (e) => {
+    e.preventDefault();
+    dispatch(generateInvoice(invoiceForm)).then((result) => {
       if (generateInvoice.fulfilled.match(result)) {
+        setDialogOpen(false);
+        setInvoiceForm({
+          userId: "",
+          clientName: "",
+          clientEmail: "",
+          startDate: "",
+          endDate: "",
+          hourlyRate: "",
+        });
         setSnackbar({
           open: true,
           message: "Invoice generated successfully!",
           severity: "success"
         });
-        handleCloseDialog();
-        // Refresh invoice list
         dispatch(fetchInvoices());
-      } else if (generateInvoice.rejected.match(result)) {
-        setSnackbar({
-          open: true,
-          message: result.payload || "Failed to generate invoice",
-          severity: "error"
-        });
       }
     });
   };
 
-  const handleCloseDialog = () => {
-    setDialogOpen(false);
-    setInvoiceForm({
-      userId: "",
-      clientName: "",
-      clientEmail: "",
-      startDate: "",
-      endDate: "",
-      hourlyRate: "",
-    });
-  };
-
-  const handleRecordPayment = (invoice) => {
+  const handlePreview = (invoice) => {
     setSelectedInvoice(invoice);
-    setPaymentForm({
-      paymentDate: new Date().toISOString().split('T')[0],
-      paymentMethod: "Bank Transfer",
-      transactionId: "",
-      notes: "",
-    });
-    setPaymentDialogOpen(true);
+    setPreviewOpen(true);
   };
 
-  const handleSubmitPayment = async () => {
-    if (!paymentForm.paymentDate || !paymentForm.paymentMethod) {
+  const handleExport = () => {
+    setSnackbar({
+      open: true,
+      message: "Downloading invoice PDF...",
+      severity: "info"
+    });
+    // Mock download delay
+    setTimeout(() => {
       setSnackbar({
         open: true,
-        message: "Please fill all required fields",
-        severity: "error"
-      });
-      return;
-    }
-
-    try {
-      const response = await API.post("/payment", {
-        invoiceId: selectedInvoice._id,
-        amount: selectedInvoice.amount,
-        paymentDate: paymentForm.paymentDate,
-        paymentMethod: paymentForm.paymentMethod,
-        transactionId: paymentForm.transactionId,
-        notes: paymentForm.notes,
-      });
-
-      setSnackbar({
-        open: true,
-        message: "Payment recorded successfully!",
+        message: "Invoice downloaded successfully!",
         severity: "success"
       });
-      
-      setPaymentDialogOpen(false);
-      dispatch(fetchInvoices()); // Refresh invoices
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: error.response?.data?.message || "Failed to record payment",
-        severity: "error"
-      });
-    }
-  };
-
-  const handleClosePaymentDialog = () => {
-    setPaymentDialogOpen(false);
-    setSelectedInvoice(null);
-  };
-
-  const getStatusChip = (status) => {
-    const colors = {
-      draft: "default",
-      sent: "info",
-      paid: "success",
-      overdue: "error",
-      pending: "warning"
-    };
-    return <Chip label={status} color={colors[status] || "default"} size="small" />;
-  };
-
-  const handleCloseSnackbar = () => {
-    setSnackbar({ ...snackbar, open: false });
+    }, 1500);
   };
 
   const formatCurrency = (amount) => {
@@ -322,27 +161,45 @@ export default function Invoices() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Invoice Management
-      </Typography>
-
-      <Paper sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h6">
-            Invoices
+      {/* Header Section */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} className="fade-in">
+        <Box>
+          <Typography variant="h4" fontWeight={700} className="gradient-text" gutterBottom>
+            Invoice Management
           </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Generate, track, and manage your invoices
+          </Typography>
+        </Box>
+        {(user?.role === 'Admin' || user?.role === 'Manager' || user?.role === 'Finance') && (
           <Button
             variant="contained"
-            onClick={handleGenerateInvoice}
-            disabled={generateLoading}
-            startIcon={generateLoading ? <CircularProgress size={20} /> : null}
+            startIcon={<Add />}
+            onClick={() => setDialogOpen(true)}
+            sx={{
+              background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+              boxShadow: '0 4px 15px rgba(17, 153, 142, 0.4)',
+              px: 3,
+              py: 1.5,
+            }}
           >
             Generate Invoice
           </Button>
-        </Box>
+        )}
+      </Box>
 
+      {/* Invoices List */}
+      <Paper
+        className="glass hover-lift slide-in-up"
+        sx={{
+          borderRadius: 3,
+          overflow: 'hidden',
+          background: 'white',
+          mb: 4
+        }}
+      >
         {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+          <Box sx={{ p: 4, textAlign: 'center' }}>
             <CircularProgress />
           </Box>
         ) : (
@@ -350,68 +207,82 @@ export default function Invoices() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Invoice Number</TableCell>
-                  <TableCell>Client</TableCell>
-                  <TableCell>Total Hours</TableCell>
-                  <TableCell>Hourly Rate</TableCell>
-                  <TableCell>Amount</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Created</TableCell>
-                  <TableCell>Due Date</TableCell>
-                  <TableCell>Actions</TableCell>
+                  <TableCell sx={{ fontWeight: 600, bgcolor: '#f8f9fa' }}>Invoice ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600, bgcolor: '#f8f9fa' }}>Client</TableCell>
+                  <TableCell sx={{ fontWeight: 600, bgcolor: '#f8f9fa' }}>Period</TableCell>
+                  <TableCell sx={{ fontWeight: 600, bgcolor: '#f8f9fa' }}>Amount</TableCell>
+                  <TableCell sx={{ fontWeight: 600, bgcolor: '#f8f9fa' }}>Status</TableCell>
+                  <TableCell sx={{ fontWeight: 600, bgcolor: '#f8f9fa' }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {invoices.map((invoice) => (
-                  <TableRow key={invoice._id}>
-                    <TableCell>{invoice.invoiceNumber}</TableCell>
+                  <TableRow key={invoice._id || invoice.id} hover sx={{ transition: 'background 0.2s' }}>
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight="bold">
-                          {invoice.clientName || invoice.userId?.name || 'N/A'}
-                        </Typography>
-                        {(invoice.clientEmail || invoice.userId?.email) && (
-                          <Typography variant="caption" color="textSecondary">
-                            {invoice.clientEmail || invoice.userId?.email}
-                          </Typography>
-                        )}
-                      </Box>
-                    </TableCell>
-                    <TableCell>{invoice.totalHours} hrs</TableCell>
-                    <TableCell>{formatCurrency(invoice.hourlyRate)}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="bold">
-                        {formatCurrency(invoice.amount || invoice.totalAmount)}
+                      <Typography variant="body2" fontWeight={600} color="primary">
+                        #{invoice.invoiceNumber || invoice._id?.substring(0, 8).toUpperCase()}
                       </Typography>
                     </TableCell>
-                    <TableCell>{getStatusChip(invoice.status)}</TableCell>
                     <TableCell>
-                      {new Date(invoice.createdAt).toLocaleDateString()}
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Business sx={{ fontSize: 18, color: 'text.secondary', mr: 1 }} />
+                        {invoice.clientName || 'Unknown Client'}
+                      </Box>
                     </TableCell>
                     <TableCell>
-                      {invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString() : 'N/A'}
+                      <Typography variant="caption" display="block" color="text.secondary">
+                        {new Date(invoice.startDate).toLocaleDateString()} - {new Date(invoice.endDate).toLocaleDateString()}
+                      </Typography>
                     </TableCell>
                     <TableCell>
-                      {invoice.status === 'Draft' && (
-                        <Button
-                          variant="contained"
-                          color="success"
+                      <Typography fontWeight={700} color="success.main">
+                        {formatCurrency(invoice.totalAmount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={invoice.status}
+                        size="small"
+                        sx={{
+                          background: invoice.status === 'Paid'
+                            ? 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)'
+                            : invoice.status === 'Overdue'
+                              ? 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)'
+                              : 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+                          color: 'white',
+                          fontWeight: 600,
+                          border: 'none'
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title="Preview Invoice">
+                        <IconButton
                           size="small"
-                          onClick={() => handleRecordPayment(invoice)}
+                          onClick={() => handlePreview(invoice)}
+                          sx={{ color: '#667eea', mr: 1 }}
                         >
-                          Record Payment
-                        </Button>
-                      )}
-                      {invoice.status === 'Paid' && (
-                        <Chip label="Paid" color="success" size="small" />
-                      )}
+                          <Visibility fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Download PDF">
+                        <IconButton
+                          size="small"
+                          onClick={handleExport}
+                          sx={{ color: '#11998e' }}
+                        >
+                          <GetApp fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))}
                 {invoices.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} align="center">
-                      No invoices found
+                    <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                      <Typography color="text.secondary">
+                        No invoices found. Generate one to get started!
+                      </Typography>
                     </TableCell>
                   </TableRow>
                 )}
@@ -422,62 +293,63 @@ export default function Invoices() {
       </Paper>
 
       {/* Generate Invoice Dialog */}
-      <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <DialogTitle>
-          Generate New Invoice
+      <Dialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 3 }
+        }}
+      >
+        <DialogTitle sx={{ borderBottom: '1px solid #f0f0f0', pb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ p: 1, borderRadius: 2, bgcolor: 'primary.light', mr: 2, color: 'white' }}>
+              <Receipt />
+            </Box>
+            <Typography variant="h6" fontWeight={700}>
+              Generate New Invoice
+            </Typography>
+          </Box>
         </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-            Generate an invoice based on approved timesheets within the date range.
-          </Typography>
-          <Grid container spacing={3} sx={{ mt: 1 }}>
-            <Grid item xs={12}>
+        <DialogContent sx={{ pt: 3 }}>
+          {generateError && <Alert severity="error" sx={{ mb: 2 }}>{generateError}</Alert>}
+          <Grid container spacing={3} sx={{ mt: 0 }}>
+            <Grid item xs={12} md={6}>
               <TextField
-                fullWidth
                 select
+                fullWidth
                 label="Select Employee"
                 value={invoiceForm.userId}
-                onChange={(e) => {
-                  const selectedUser = users.find(u => (u._id || u.id) === e.target.value);
-                  setInvoiceForm({ 
-                    ...invoiceForm, 
-                    userId: e.target.value,
-                    // Auto-fill hourly rate if available
-                    hourlyRate: selectedUser?.hourlyRate || invoiceForm.hourlyRate
-                  });
-                }}
-                required
-                helperText="Choose the employee whose timesheets should be invoiced"
-                disabled={users.length === 0}
+                onChange={(e) => setInvoiceForm({ ...invoiceForm, userId: e.target.value })}
+                sx={{ mb: 2 }}
               >
-                <MenuItem value="">
-                  <em>{users.length === 0 ? "Loading users..." : "Select an employee"}</em>
-                </MenuItem>
-                {users.map((user) => (
-                  <MenuItem key={user._id || user.id} value={user._id || user.id}>
-                    {user.name} - {user.email} ({user.role}
-                    {user.department ? `, ${user.department}` : ''}
-                    {user.hourlyRate ? `, $${user.hourlyRate}/hr` : ''})
+                {users.map((u) => (
+                  <MenuItem key={u._id || u.id} value={u._id || u.id}>
+                    {u.name} ({u.email})
                   </MenuItem>
                 ))}
               </TextField>
-            </Grid>
-            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Client Name"
                 value={invoiceForm.clientName}
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, clientName: e.target.value })}
-                required
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: <Business sx={{ color: 'text.secondary', mr: 1 }} />,
+                }}
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="Client Email"
                 type="email"
                 value={invoiceForm.clientEmail}
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, clientEmail: e.target.value })}
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: <Email sx={{ color: 'text.secondary', mr: 1 }} />,
+                }}
               />
             </Grid>
             <Grid item xs={12} md={6}>
@@ -485,138 +357,199 @@ export default function Invoices() {
                 fullWidth
                 label="Start Date"
                 type="date"
+                InputLabelProps={{ shrink: true }}
                 value={invoiceForm.startDate}
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, startDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                required
+                sx={{ mb: 2 }}
               />
-            </Grid>
-            <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 label="End Date"
                 type="date"
+                InputLabelProps={{ shrink: true }}
                 value={invoiceForm.endDate}
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, endDate: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-                required
+                sx={{ mb: 2 }}
               />
-            </Grid>
-            <Grid item xs={12}>
               <TextField
                 fullWidth
                 label="Hourly Rate ($)"
                 type="number"
-                inputProps={{ step: 0.01, min: 0 }}
                 value={invoiceForm.hourlyRate}
                 onChange={(e) => setInvoiceForm({ ...invoiceForm, hourlyRate: e.target.value })}
-                required
+                sx={{ mb: 2 }}
+                InputProps={{
+                  startAdornment: <AttachMoney sx={{ color: 'text.secondary', mr: 1 }} />,
+                }}
               />
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={generateLoading}>
+        <DialogActions sx={{ p: 3, borderTop: '1px solid #f0f0f0' }}>
+          <Button onClick={() => setDialogOpen(false)} color="inherit">
             Cancel
           </Button>
           <Button
-            onClick={handleSubmitInvoice}
+            onClick={handleGenerate}
             variant="contained"
             disabled={generateLoading}
-            startIcon={generateLoading ? <CircularProgress size={20} /> : null}
+            sx={{
+              background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+              boxShadow: '0 4px 15px rgba(17, 153, 142, 0.4)',
+            }}
           >
-            Generate Invoice
+            {generateLoading ? "Generating..." : "Generate Invoice"}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Record Payment Dialog */}
-      <Dialog open={paymentDialogOpen} onClose={handleClosePaymentDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Record Payment
-        </DialogTitle>
-        <DialogContent>
-          {selectedInvoice && (
-            <>
-              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-                Recording payment for <strong>{selectedInvoice.invoiceNumber}</strong>
-              </Typography>
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
-                <Typography variant="body2"><strong>Amount:</strong> ${selectedInvoice.amount?.toFixed(2)}</Typography>
-                <Typography variant="body2"><strong>Client:</strong> {selectedInvoice.clientName || selectedInvoice.userId?.name}</Typography>
+      {/* Invoice Preview Modal */}
+      <Dialog
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 0, minHeight: '80vh' }
+        }}
+      >
+        {selectedInvoice && (
+          <Box sx={{ p: 5 }}>
+            {/* Invoice Header */}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 5 }}>
+              <Box>
+                <Typography variant="h4" fontWeight={800} color="primary" gutterBottom>
+                  INVOICE
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  #{selectedInvoice.invoiceNumber || selectedInvoice._id?.substring(0, 8).toUpperCase()}
+                </Typography>
               </Box>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Payment Date"
-                    type="date"
-                    value={paymentForm.paymentDate}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentDate: e.target.value })}
-                    InputLabelProps={{ shrink: true }}
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    select
-                    label="Payment Method"
-                    value={paymentForm.paymentMethod}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, paymentMethod: e.target.value })}
-                    required
-                  >
-                    <MenuItem value="Bank Transfer">Bank Transfer</MenuItem>
-                    <MenuItem value="Credit Card">Credit Card</MenuItem>
-                    <MenuItem value="Cash">Cash</MenuItem>
-                    <MenuItem value="Check">Check</MenuItem>
-                    <MenuItem value="PayPal">PayPal</MenuItem>
-                    <MenuItem value="Other">Other</MenuItem>
-                  </TextField>
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Transaction ID (Optional)"
-                    value={paymentForm.transactionId}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, transactionId: e.target.value })}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    label="Notes (Optional)"
-                    multiline
-                    rows={3}
-                    value={paymentForm.notes}
-                    onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                  />
-                </Grid>
+              <Box sx={{ textAlign: 'right' }}>
+                <Typography variant="h6" fontWeight={700}>
+                  Timesheet Platform Inc.
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  123 Tech Street, Silicon Valley
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  billing@timesheet.com
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Bill To */}
+            <Grid container spacing={4} sx={{ mb: 5 }}>
+              <Grid item xs={6}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.secondary" gutterBottom>
+                  BILL TO
+                </Typography>
+                <Typography variant="h6" fontWeight={600}>
+                  {selectedInvoice.clientName}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {selectedInvoice.clientEmail}
+                </Typography>
               </Grid>
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClosePaymentDialog}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSubmitPayment}
-            variant="contained"
-            color="success"
-          >
-            Record Payment
-          </Button>
-        </DialogActions>
+              <Grid item xs={6} sx={{ textAlign: 'right' }}>
+                <Typography variant="subtitle2" fontWeight={700} color="text.secondary" gutterBottom>
+                  DETAILS
+                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>Date Issued:</Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {new Date(selectedInvoice.createdAt).toLocaleDateString()}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mr: 2 }}>Due Date:</Typography>
+                  <Typography variant="body2" fontWeight={600}>
+                    {new Date(selectedInvoice.dueDate).toLocaleDateString()}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+
+            {/* Line Items */}
+            <TableContainer component={Paper} variant="outlined" sx={{ mb: 4 }}>
+              <Table>
+                <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Description</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Hours</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Rate</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Amount</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>
+                      <Typography fontWeight={500}>Development Services</Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Period: {new Date(selectedInvoice.startDate).toLocaleDateString()} - {new Date(selectedInvoice.endDate).toLocaleDateString()}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">{selectedInvoice.totalHours}</TableCell>
+                    <TableCell align="right">{formatCurrency(selectedInvoice.hourlyRate)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>
+                      {formatCurrency(selectedInvoice.totalAmount)}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Total */}
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 4 }}>
+              <Box sx={{ width: 250 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body2" color="text.secondary">Subtotal:</Typography>
+                  <Typography variant="body2" fontWeight={600}>{formatCurrency(selectedInvoice.totalAmount)}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                  <Typography variant="body2" color="text.secondary">Tax (0%):</Typography>
+                  <Typography variant="body2" fontWeight={600}>$0.00</Typography>
+                </Box>
+                <Divider sx={{ mb: 2 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="h6" fontWeight={700}>Total:</Typography>
+                  <Typography variant="h6" fontWeight={700} color="primary">
+                    {formatCurrency(selectedInvoice.totalAmount)}
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+
+            {/* Footer Actions */}
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 8 }}>
+              <Button
+                variant="outlined"
+                startIcon={<Close />}
+                onClick={() => setPreviewOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<GetApp />}
+                onClick={handleExport}
+                sx={{
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                }}
+              >
+                Download PDF
+              </Button>
+            </Box>
+          </Box>
+        )}
       </Dialog>
 
-      {/* Snackbar for notifications */}
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity}>
+        <Alert severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

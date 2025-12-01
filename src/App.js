@@ -1,8 +1,11 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { useSelector } from 'react-redux';
+
+// Import premium theme
+import theme from './theme/theme';
 
 // Import components
 import Navbar from './components/Navbar';
@@ -20,18 +23,6 @@ import AuditLogs from './pages/AuditLogs';
 
 import './App.css';
 
-const theme = createTheme({
-  palette: {
-    mode: 'light',
-    primary: {
-      main: '#1976d2',
-    },
-    secondary: {
-      main: '#dc004e',
-    },
-  },
-});
-
 function App() {
   const { user } = useSelector((state) => state.auth);
 
@@ -42,13 +33,13 @@ function App() {
         <div className="App">
           {user && <Navbar />}
           <Routes>
-            <Route 
-              path="/login" 
-              element={!user ? <Login /> : <Navigate to="/dashboard" />} 
+            <Route
+              path="/login"
+              element={!user ? <Login /> : <Navigate to="/dashboard" />}
             />
-            <Route 
-              path="/register" 
-              element={!user ? <Register /> : <Navigate to="/dashboard" />} 
+            <Route
+              path="/register"
+              element={!user ? <Register /> : <Navigate to="/dashboard" />}
             />
             <Route
               path="/dashboard"
@@ -98,9 +89,9 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/" 
-              element={<Navigate to={user ? "/dashboard" : "/login"} />} 
+            <Route
+              path="/"
+              element={<Navigate to={user ? "/dashboard" : "/login"} />}
             />
           </Routes>
         </div>
