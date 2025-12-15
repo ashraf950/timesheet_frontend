@@ -15,13 +15,18 @@ import {
   Chip,
   Box,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Grid,
-  MenuItem,
+      <Dialog
+        open={dialogOpen}
+        onClose={handleCloseDialog}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            animation: dialogOpen ? 'fadeInDialog 0.5s' : 'none',
+          }
+        }}
+      >
   Snackbar,
   Alert,
   Tooltip,
@@ -127,28 +132,47 @@ export default function Payments() {
   };
 
   const getStatusChip = (status) => {
+    // Enhanced color and icon for each status
     const styles = {
-      paid: { bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', icon: <CheckCircle sx={{ fontSize: 16 }} /> },
-      pending: { bg: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', icon: <Warning sx={{ fontSize: 16 }} /> },
-      overdue: { bg: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)', icon: <Warning sx={{ fontSize: 16 }} /> },
-      partial: { bg: 'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)', icon: <Info sx={{ fontSize: 16 }} /> }
+      paid: {
+        bg: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+        icon: <CheckCircle sx={{ fontSize: 18 }}/> ,
+        tooltip: 'Payment received',
+      },
+      pending: {
+        bg: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+        icon: <Warning sx={{ fontSize: 18 }}/> ,
+        tooltip: 'Awaiting payment',
+      },
+      overdue: {
+        bg: 'linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%)',
+        icon: <Warning sx={{ fontSize: 18 }}/> ,
+        tooltip: 'Payment overdue',
+      },
+      partial: {
+        bg: 'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)',
+        icon: <Info sx={{ fontSize: 18 }}/> ,
+        tooltip: 'Partially paid',
+      },
     };
-
     const style = styles[status] || styles.pending;
-
     return (
-      <Chip
-        icon={style.icon}
-        label={status.toUpperCase()}
-        size="small"
-        sx={{
-          background: style.bg,
-          color: 'white',
-          fontWeight: 700,
-          border: 'none',
-          '& .MuiChip-icon': { color: 'white' }
-        }}
-      />
+      <Tooltip title={style.tooltip} arrow>
+        <Chip
+          icon={style.icon}
+          label={status.toUpperCase()}
+          size="small"
+          sx={{
+            background: style.bg,
+            color: 'white',
+            fontWeight: 700,
+            border: 'none',
+            letterSpacing: 1,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            '& .MuiChip-icon': { color: 'white' }
+          }}
+        />
+      </Tooltip>
     );
   };
 
@@ -215,7 +239,20 @@ export default function Payments() {
       {/* Stats Cards */}
       <Grid container spacing={3} sx={{ mb: 4 }} className="slide-in-up">
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', color: 'white' }} className="hover-lift">
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)',
+              color: 'white',
+              transition: 'transform 0.25s cubic-bezier(.4,2,.6,1)',
+              '&:hover': {
+                transform: 'scale(1.045)',
+                boxShadow: '0 8px 32px rgba(17,153,142,0.18)',
+              },
+            }}
+            className="hover-lift"
+          >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>Total Collected</Typography>
@@ -228,7 +265,22 @@ export default function Payments() {
           </Paper>
         </Grid>
         <Grid item xs={12} md={6}>
-          <Paper sx={{ p: 3, borderRadius: 3, background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)', color: 'white' }} className="hover-lift">
+          <Paper
+            sx={{
+              p: 3,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, #f5af19 0%, #f12711 100%)',
+              color: 'white',
+              transition: 'transform 0.25s cubic-bezier(.4,2,.6,1)',
+              '&:hover': {
+                transform: 'scale(1.045)',
+                boxShadow: '0 8px 32px rgba(245,175,25,0.18)',
+              },
+            }}
+            className="hover-lift"
+          >
+            // Add these keyframes to your global CSS (e.g., App.css):
+            // @keyframes fadeInDialog { from { opacity: 0; transform: scale(0.95);} to { opacity: 1; transform: scale(1);} }
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
                 <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>Pending Collection</Typography>
@@ -269,8 +321,17 @@ export default function Payments() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {payments.map((payment) => (
-                  <TableRow key={payment._id} hover sx={{ '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.02)' } }}>
+                {payments.map((payment, idx) => (
+                  <TableRow
+                    key={payment._id}
+                    hover
+                    sx={{
+                      '&:hover': { bgcolor: 'rgba(102, 126, 234, 0.04)' },
+                      animation: 'fadeInRow 0.7s',
+                      animationDelay: `${idx * 60}ms`,
+                      animationFillMode: 'backwards',
+                    }}
+                  >
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Box sx={{ p: 1, borderRadius: 2, bgcolor: '#e3f2fd', color: '#1976d2', mr: 2 }}>
@@ -320,20 +381,24 @@ export default function Payments() {
                     </TableCell>
                     <TableCell>
                       {payment.status !== 'paid' && (
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<AutoAwesome />}
-                          onClick={() => handleReconcilePayment(payment)}
-                          sx={{
-                            borderRadius: 2,
-                            borderColor: '#667eea',
-                            color: '#667eea',
-                            '&:hover': { borderColor: '#764ba2', bgcolor: 'rgba(102, 126, 234, 0.04)' }
-                          }}
-                        >
-                          Smart Reconcile
-                        </Button>
+                        <Tooltip title="Record payment & mark as paid" arrow>
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<AutoAwesome />}
+                            onClick={() => handleReconcilePayment(payment)}
+                            sx={{
+                              borderRadius: 2,
+                              borderColor: '#667eea',
+                              color: '#667eea',
+                              fontWeight: 700,
+                              letterSpacing: 0.5,
+                              '&:hover': { borderColor: '#764ba2', bgcolor: 'rgba(102, 126, 234, 0.04)' }
+                            }}
+                          >
+                            Smart Reconcile
+                          </Button>
+                        </Tooltip>
                       )}
                     </TableCell>
                   </TableRow>
@@ -342,6 +407,7 @@ export default function Payments() {
                   <TableRow>
                     <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
                       <Box sx={{ textAlign: 'center' }}>
+                        <img src="https://cdn-icons-png.flaticon.com/512/4076/4076549.png" alt="No payments" width={80} style={{ opacity: 0.7, marginBottom: 16 }} />
                         <Typography variant="h6" color="text.secondary" gutterBottom>
                           No payments found
                         </Typography>
@@ -352,6 +418,9 @@ export default function Payments() {
                     </TableCell>
                   </TableRow>
                 )}
+                // Add fadeInRow animation
+                // Add this style at the end of the file or in your global CSS
+                // @keyframes fadeInRow { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
               </TableBody>
             </Table>
           </TableContainer>
